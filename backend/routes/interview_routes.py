@@ -5,10 +5,8 @@ Handles mock interview sessions, questions, and answer evaluation
 
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-import uuid
 
 from routes.auth_routes import require_auth
-from database.firebase_config import get_firestore_client, INTERVIEW_SESSIONS_COLLECTION
 from models.interview_session import InterviewSession
 from services.question_generator_service import get_questions_for_role, generate_follow_up_question
 from services.ai_interview_service import evaluate_interview_answer
@@ -28,6 +26,7 @@ def start_interview():
         job_role = data.get('job_role', 'Software Engineer')
         skill_level = data.get('skill_level', 'Beginner')
         num_questions = data.get('num_questions', 5)
+        interview_type = data.get('interview_type', 'text')
         
         # Validate inputs
         if num_questions < 1 or num_questions > 10:
@@ -37,36 +36,31 @@ def start_interview():
         questions = get_questions_for_role(job_role, skill_level, num_questions)
         
         # Create interview session
-        session = InterviewSession(
+        session = InterviewSession.create(
             user_id=request.user_id,
             job_role=job_role,
             skill_level=skill_level,
-            questions=questions
+            questions=questions,
+            interview_type=interview_type
         )
         
-        # Save to Firestore
-        db = get_firestore_client()
-        if db is None:
+        if session:
+            return jsonify({
+                'success': True,
+                'message': 'Interview session started',
+                'data': {
+                    'session_id': session['id'],
+                    'job_role': job_role,
+                    'skill_level': skill_level,
+                    'questions': questions,
+                    'total_questions': len(questions)
+                }
+            }), 201
+        else:
             return jsonify({
                 'success': False,
-                'message': 'Database not available'
-            }), 503
-        
-        db.collection(INTERVIEW_SESSIONS_COLLECTION).document(session.session_id).set(
-            session.to_dict()
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Interview session started',
-            'data': {
-                'session_id': session.session_id,
-                'job_role': job_role,
-                'skill_level': skill_level,
-                'questions': questions,
-                'total_questions': len(questions)
-            }
-        }), 201
+                'message': 'Failed to create session'
+            }), 500
         
     except Exception as e:
         return jsonify({
@@ -125,28 +119,17 @@ def submit_answer():
                 'message': 'session_id, question_id, question, and answer are required'
             }), 400
         
-        # Get Firestore client
-        db = get_firestore_client()
-        if db is None:
-            return jsonify({
-                'success': False,
-                'message': 'Database not available'
-            }), 503
-        
         # Get session
-        session_ref = db.collection(INTERVIEW_SESSIONS_COLLECTION).document(session_id)
-        session_doc = session_ref.get()
+        session = InterviewSession.get_by_id(session_id)
         
-        if not session_doc.exists:
+        if not session:
             return jsonify({
                 'success': False,
                 'message': 'Interview session not found'
             }), 404
         
-        session_data = session_doc.to_dict()
-        
         # Verify session belongs to user
-        if session_data['user_id'] != request.user_id:
+        if session['user_id'] != request.user_id:
             return jsonify({
                 'success': False,
                 'message': 'Unauthorized access to session'
@@ -156,8 +139,8 @@ def submit_answer():
         evaluation = evaluate_interview_answer(
             question=question_text,
             answer=answer,
-            job_role=session_data['job_role'],
-            skill_level=session_data['skill_level']
+            job_role=session['job_role'],
+            skill_level=session['skill_level']
         )
         
         # Create answer record
@@ -166,15 +149,15 @@ def submit_answer():
             'question': question_text,
             'answer': answer,
             'evaluation': evaluation,
-            'timestamp': datetime.now()
+            'timestamp': datetime.now().isoformat()
         }
         
         # Update session with answer
-        answers = session_data.get('answers', [])
+        answers = session.get('answers', [])
         answers.append(answer_record)
         
         # Update scores
-        scores = session_data.get('scores', {})
+        scores = session.get('scores', {})
         scores[question_id] = {
             'score': evaluation['overall_score'],
             'relevance': evaluation['relevance']['score'],
@@ -183,7 +166,7 @@ def submit_answer():
             'sentiment': evaluation['sentiment_score']
         }
         
-        session_ref.update({
+        InterviewSession.update(session_id, {
             'answers': answers,
             'scores': scores
         })
@@ -226,26 +209,16 @@ def submit_voice_answer():
                 'message': 'session_id, question_id, question, and transcript are required'
             }), 400
         
-        # Evaluate answer (same as text answer)
-        db = get_firestore_client()
-        if db is None:
-            return jsonify({
-                'success': False,
-                'message': 'Database not available'
-            }), 503
+        # Get session
+        session = InterviewSession.get_by_id(session_id)
         
-        session_ref = db.collection(INTERVIEW_SESSIONS_COLLECTION).document(session_id)
-        session_doc = session_ref.get()
-        
-        if not session_doc.exists:
+        if not session:
             return jsonify({
                 'success': False,
                 'message': 'Interview session not found'
             }), 404
         
-        session_data = session_doc.to_dict()
-        
-        if session_data['user_id'] != request.user_id:
+        if session['user_id'] != request.user_id:
             return jsonify({
                 'success': False,
                 'message': 'Unauthorized access to session'
@@ -255,8 +228,8 @@ def submit_voice_answer():
         evaluation = evaluate_interview_answer(
             question=question_text,
             answer=transcript,
-            job_role=session_data['job_role'],
-            skill_level=session_data['skill_level']
+            job_role=session['job_role'],
+            skill_level=session['skill_level']
         )
         
         # Create answer record
@@ -267,14 +240,14 @@ def submit_voice_answer():
             'is_voice': True,
             'audio_duration': audio_duration,
             'evaluation': evaluation,
-            'timestamp': datetime.now()
+            'timestamp': datetime.now().isoformat()
         }
         
         # Update session
-        answers = session_data.get('answers', [])
+        answers = session.get('answers', [])
         answers.append(answer_record)
         
-        scores = session_data.get('scores', {})
+        scores = session.get('scores', {})
         scores[question_id] = {
             'score': evaluation['overall_score'],
             'relevance': evaluation['relevance']['score'],
@@ -283,7 +256,7 @@ def submit_voice_answer():
             'sentiment': evaluation['sentiment_score']
         }
         
-        session_ref.update({
+        InterviewSession.update(session_id, {
             'answers': answers,
             'scores': scores
         })
@@ -312,33 +285,24 @@ def get_feedback(session_id):
     Includes overall score, individual scores, and recommendations
     """
     try:
-        db = get_firestore_client()
-        if db is None:
-            return jsonify({
-                'success': False,
-                'message': 'Database not available'
-            }), 503
-        
         # Get session
-        session_doc = db.collection(INTERVIEW_SESSIONS_COLLECTION).document(session_id).get()
+        session = InterviewSession.get_by_id(session_id)
         
-        if not session_doc.exists:
+        if not session:
             return jsonify({
                 'success': False,
                 'message': 'Interview session not found'
             }), 404
         
-        session_data = session_doc.to_dict()
-        
         # Verify ownership
-        if session_data['user_id'] != request.user_id:
+        if session['user_id'] != request.user_id:
             return jsonify({
                 'success': False,
                 'message': 'Unauthorized access to session'
             }), 403
         
         # Calculate overall session score
-        scores = session_data.get('scores', {})
+        scores = session.get('scores', {})
         if scores:
             score_values = [s['score'] for s in scores.values()]
             overall_score = sum(score_values) / len(score_values)
@@ -346,23 +310,23 @@ def get_feedback(session_id):
             overall_score = 0
         
         # Mark session as completed
-        session_ref = db.collection(INTERVIEW_SESSIONS_COLLECTION).document(session_id)
-        session_ref.update({
+        InterviewSession.update(session_id, {
             'status': 'completed',
-            'overall_score': overall_score
+            'overall_score': int(overall_score),
+            'completed_at': datetime.now().isoformat()
         })
         
         return jsonify({
             'success': True,
             'data': {
                 'session_id': session_id,
-                'job_role': session_data['job_role'],
-                'skill_level': session_data['skill_level'],
+                'job_role': session['job_role'],
+                'skill_level': session['skill_level'],
                 'overall_score': round(overall_score, 2),
                 'scores': scores,
-                'answers': session_data.get('answers', []),
-                'questions': session_data.get('questions', []),
-                'timestamp': session_data.get('timestamp')
+                'answers': session.get('answers', []),
+                'questions': session.get('questions', []),
+                'created_at': session.get('created_at')
             }
         }), 200
         

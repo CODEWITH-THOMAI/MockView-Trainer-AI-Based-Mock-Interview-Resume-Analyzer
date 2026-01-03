@@ -1,106 +1,92 @@
 """
 Resume Model
-Represents resume data structure in Firestore
+Represents resume data structure in Supabase PostgreSQL
 """
 
+from database.supabase_config import get_supabase_client, RESUMES_TABLE
 from datetime import datetime
 from typing import Dict, List, Optional
-import uuid
 
 class Resume:
-    """Resume model with content and analysis results"""
-    
-    def __init__(
-        self,
-        user_id: str,
-        resume_id: Optional[str] = None,
-        content: Optional[Dict] = None,
-        analysis: Optional[Dict] = None,
-        score: float = 0.0,
-        suggestions: Optional[List[str]] = None,
-        file_url: Optional[str] = None,
-        timestamp: Optional[datetime] = None
-    ):
-        self.resume_id = resume_id or str(uuid.uuid4())
-        self.user_id = user_id
-        self.content = content or {}
-        self.analysis = analysis or {}
-        self.score = score
-        self.suggestions = suggestions or []
-        self.file_url = file_url
-        self.timestamp = timestamp or datetime.now()
-    
-    def to_dict(self) -> Dict:
-        """Convert resume to dictionary for Firestore"""
-        return {
-            'resume_id': self.resume_id,
-            'user_id': self.user_id,
-            'content': self.content,
-            'analysis': self.analysis,
-            'score': self.score,
-            'suggestions': self.suggestions,
-            'file_url': self.file_url,
-            'timestamp': self.timestamp
-        }
+    """Resume model for Supabase"""
     
     @staticmethod
-    def from_dict(data: Dict) -> 'Resume':
-        """Create Resume from Firestore document"""
-        return Resume(
-            resume_id=data.get('resume_id'),
-            user_id=data.get('user_id'),
-            content=data.get('content', {}),
-            analysis=data.get('analysis', {}),
-            score=data.get('score', 0.0),
-            suggestions=data.get('suggestions', []),
-            file_url=data.get('file_url'),
-            timestamp=data.get('timestamp')
-        )
-    
-    def set_content(self, content: Dict):
-        """Set resume content"""
-        self.content = content
-    
-    def set_analysis(self, analysis: Dict):
-        """Set analysis results"""
-        self.analysis = analysis
-    
-    def set_score(self, score: float):
-        """Set overall resume score"""
-        self.score = score
-    
-    def add_suggestion(self, suggestion: str):
-        """Add an improvement suggestion"""
-        self.suggestions.append(suggestion)
-    
-    def calculate_score(self) -> float:
-        """Calculate overall score from analysis components"""
-        if not self.analysis:
-            return 0.0
+    def create(user_id: str, content: Optional[Dict] = None, analysis: Optional[Dict] = None,
+               score: float = 0.0, suggestions: Optional[List] = None, file_url: Optional[str] = None,
+               resume_type: str = 'uploaded', parsed_text: Optional[str] = None,
+               target_job_role: Optional[str] = None):
+        """Create new resume"""
+        supabase = get_supabase_client()
         
-        # Extract scores from analysis
-        grammar_score = self.analysis.get('grammar_score', 0)
-        structure_score = self.analysis.get('structure_score', 0)
-        ats_score = self.analysis.get('ats_score', 0)
-        keyword_score = self.analysis.get('keyword_score', 0)
+        if supabase is None:
+            raise Exception("Database not available")
         
-        # Weighted average
-        weights = {
-            'grammar': 0.25,
-            'structure': 0.20,
-            'ats': 0.25,
-            'keywords': 0.30
+        data = {
+            'user_id': user_id,
+            'resume_type': resume_type,
+            'file_url': file_url,
+            'content': content or {},
+            'parsed_text': parsed_text,
+            'analysis': analysis or {},
+            'overall_score': int(score) if score else None,
+            'suggestions': suggestions or [],
+            'target_job_role': target_job_role
         }
         
-        self.score = round(
-            grammar_score * weights['grammar'] +
-            structure_score * weights['structure'] +
-            ats_score * weights['ats'] +
-            keyword_score * weights['keywords'],
-            2
-        )
+        # Extract individual scores from analysis if available
+        if analysis:
+            data['ats_score'] = int(analysis.get('ats_score', 0))
+            data['grammar_score'] = int(analysis.get('grammar_score', 0))
+            data['keyword_match_score'] = int(analysis.get('keyword_score', 0))
         
-        return self.score
+        result = supabase.table(RESUMES_TABLE).insert(data).execute()
+        return result.data[0] if result.data else None
     
-    def __repr__(self):
-        return f"<Resume {self.resume_id} - Score: {self.score}>"
+    @staticmethod
+    def get_by_id(resume_id: str):
+        """Get resume by ID"""
+        supabase = get_supabase_client()
+        
+        if supabase is None:
+            raise Exception("Database not available")
+        
+        result = supabase.table(RESUMES_TABLE).select('*').eq('id', resume_id).execute()
+        return result.data[0] if result.data else None
+    
+    @staticmethod
+    def get_user_resumes(user_id: str, limit: int = 10):
+        """Get user's resumes"""
+        supabase = get_supabase_client()
+        
+        if supabase is None:
+            raise Exception("Database not available")
+        
+        result = supabase.table(RESUMES_TABLE)\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .limit(limit)\
+            .execute()
+        return result.data
+    
+    @staticmethod
+    def update(resume_id: str, data: Dict):
+        """Update resume"""
+        supabase = get_supabase_client()
+        
+        if supabase is None:
+            raise Exception("Database not available")
+        
+        result = supabase.table(RESUMES_TABLE).update(data).eq('id', resume_id).execute()
+        return result.data[0] if result.data else None
+    
+    @staticmethod
+    def delete(resume_id: str):
+        """Delete resume"""
+        supabase = get_supabase_client()
+        
+        if supabase is None:
+            raise Exception("Database not available")
+        
+        result = supabase.table(RESUMES_TABLE).delete().eq('id', resume_id).execute()
+        return result.data

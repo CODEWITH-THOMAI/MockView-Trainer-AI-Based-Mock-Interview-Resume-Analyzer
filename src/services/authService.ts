@@ -1,6 +1,7 @@
 /**
  * Authentication Service
  * Handles user authentication, registration, and profile management
+ * Updated to work with Supabase backend
  */
 
 import apiClient, { API_ENDPOINTS } from './api';
@@ -19,7 +20,7 @@ export interface LoginData {
 }
 
 export interface User {
-  uid: string;
+  id: string;
   email: string;
   name: string;
   skill_level: string;
@@ -33,7 +34,8 @@ export interface AuthResponse {
   message: string;
   data?: {
     user: User;
-    token: string;
+    session?: any;
+    access_token?: string;
   };
   error?: string;
 }
@@ -47,7 +49,9 @@ export const signup = async (data: SignupData): Promise<AuthResponse> => {
     
     if (response.data.success && response.data.data) {
       // Store token and user data
-      localStorage.setItem('authToken', response.data.data.token);
+      if (response.data.data.access_token) {
+        localStorage.setItem('authToken', response.data.data.access_token);
+      }
       localStorage.setItem('user', JSON.stringify(response.data.data.user));
     }
     
@@ -70,7 +74,9 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
     
     if (response.data.success && response.data.data) {
       // Store token and user data
-      localStorage.setItem('authToken', response.data.data.token);
+      if (response.data.data.access_token) {
+        localStorage.setItem('authToken', response.data.data.access_token);
+      }
       localStorage.setItem('user', JSON.stringify(response.data.data.user));
     }
     
@@ -87,9 +93,17 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 /**
  * Logout user
  */
-export const logout = (): void => {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('user');
+export const logout = async (): Promise<void> => {
+  try {
+    // Call backend logout endpoint
+    await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
+  } catch (error) {
+    console.error('Logout error:', error);
+  } finally {
+    // Clear local storage regardless of API call result
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }
 };
 
 /**
