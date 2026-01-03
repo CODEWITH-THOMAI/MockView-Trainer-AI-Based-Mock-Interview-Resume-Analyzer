@@ -1,17 +1,14 @@
 """
 Authentication Routes
-Handles user signup, login, and profile management
+Handles user signup, login, and profile management with Supabase Auth
 """
 
 from flask import Blueprint, request, jsonify
-from firebase_admin import auth as firebase_auth
-import jwt
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
 
-from database.firebase_config import get_firestore_client, USERS_COLLECTION
+from database.supabase_config import get_supabase_client
 from models.user import User
-from config import Config
 from utils.validators import validate_email, validate_password
 
 auth_bp = Blueprint('auth', __name__)
@@ -20,56 +17,61 @@ def require_auth(f):
     """Decorator to require authentication for routes"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        auth_header = request.headers.get('Authorization', '')
         
-        if not token:
+        if not auth_header or not auth_header.startswith('Bearer '):
             return jsonify({
                 'success': False,
                 'message': 'No authorization token provided'
             }), 401
         
+        token = auth_header.replace('Bearer ', '')
+        
         try:
-            # Verify JWT token
-            payload = jwt.decode(token, Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
-            request.user_id = payload['uid']
-            return f(*args, **kwargs)
-        except jwt.ExpiredSignatureError:
+            supabase = get_supabase_client()
+            if supabase is None:
+                return jsonify({
+                    'success': False,
+                    'message': 'Database not available'
+                }), 503
+            
+            # Verify token with Supabase
+            user_response = supabase.auth.get_user(token)
+            
+            if user_response and user_response.user:
+                request.user_id = user_response.user.id
+                request.user_email = user_response.user.email
+                return f(*args, **kwargs)
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid token'
+                }), 401
+                
+        except Exception as e:
             return jsonify({
                 'success': False,
-                'message': 'Token has expired'
-            }), 401
-        except jwt.InvalidTokenError:
-            return jsonify({
-                'success': False,
-                'message': 'Invalid token'
+                'message': f'Authentication failed: {str(e)}'
             }), 401
     
     return decorated_function
 
-def generate_jwt_token(uid: str) -> str:
-    """Generate JWT token for user"""
-    payload = {
-        'uid': uid,
-        'exp': datetime.utcnow() + timedelta(seconds=Config.JWT_ACCESS_TOKEN_EXPIRES),
-        'iat': datetime.utcnow()
-    }
-    return jwt.encode(payload, Config.JWT_SECRET_KEY, algorithm=Config.JWT_ALGORITHM)
-
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     """
-    User registration endpoint
-    Creates new user in Firebase Authentication and Firestore
+    User registration with Supabase Auth
+    Body: { email, password, name, skill_level, job_role }
     """
     try:
         data = request.get_json()
-        
-        # Validate required fields
         email = data.get('email', '').strip()
         password = data.get('password', '').strip()
         name = data.get('name', '').strip()
+        skill_level = data.get('skill_level', 'Beginner')
+        job_role = data.get('job_role', 'Software Engineer')
         
-        if not email or not password or not name:
+        # Validate input
+        if not all([email, password, name]):
             return jsonify({
                 'success': False,
                 'message': 'Email, password, and name are required'
@@ -90,199 +92,172 @@ def signup():
                 'message': message
             }), 400
         
-        # Get Firestore client
-        db = get_firestore_client()
-        if db is None:
+        supabase = get_supabase_client()
+        if supabase is None:
             return jsonify({
                 'success': False,
                 'message': 'Database not available'
             }), 503
         
-        # Create user in Firebase Authentication
-        try:
-            firebase_user = firebase_auth.create_user(
+        # Create auth user in Supabase
+        auth_response = supabase.auth.sign_up({
+            'email': email,
+            'password': password
+        })
+        
+        if auth_response.user:
+            # Create user profile in database
+            user = User.create(
                 email=email,
-                password=password,
-                display_name=name
+                name=name,
+                skill_level=skill_level,
+                job_role=job_role,
+                user_id=auth_response.user.id
             )
-            uid = firebase_user.uid
-        except Exception as e:
-            error_message = str(e)
-            if 'EMAIL_EXISTS' in error_message:
-                return jsonify({
-                    'success': False,
-                    'message': 'Email already exists'
-                }), 400
+            
+            session_data = None
+            access_token = None
+            
+            if auth_response.session:
+                session_data = {
+                    'access_token': auth_response.session.access_token,
+                    'refresh_token': auth_response.session.refresh_token,
+                    'expires_at': auth_response.session.expires_at,
+                    'token_type': auth_response.session.token_type
+                }
+                access_token = auth_response.session.access_token
+            
+            return jsonify({
+                'success': True,
+                'message': 'User registered successfully',
+                'data': {
+                    'user': user,
+                    'session': session_data,
+                    'access_token': access_token
+                }
+            }), 201
+        else:
             return jsonify({
                 'success': False,
-                'message': f'Failed to create user: {error_message}'
+                'message': 'Registration failed'
+            }), 400
+            
+    except Exception as e:
+        error_msg = str(e)
+        # Handle common Supabase errors
+        if 'User already registered' in error_msg or 'email' in error_msg.lower():
+            return jsonify({
+                'success': False,
+                'message': 'Email already exists'
             }), 400
         
-        # Create user profile in Firestore
-        user = User(
-            uid=uid,
-            email=email,
-            name=name,
-            skill_level=data.get('skill_level', 'Beginner'),
-            job_role=data.get('job_role', 'Software Engineer')
-        )
-        
-        db.collection(USERS_COLLECTION).document(uid).set(user.to_dict())
-        
-        # Generate JWT token
-        token = generate_jwt_token(uid)
-        
-        return jsonify({
-            'success': True,
-            'message': 'User created successfully',
-            'data': {
-                'user': user.to_dict(),
-                'token': token
-            }
-        }), 201
-        
-    except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Signup failed',
-            'error': str(e)
+            'message': f'Error: {error_msg}'
         }), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """
-    User login endpoint
-    Authenticates user and returns JWT token
+    User login with Supabase Auth
+    Body: { email, password }
     """
     try:
         data = request.get_json()
-        
         email = data.get('email', '').strip()
         password = data.get('password', '').strip()
         
-        if not email or not password:
+        if not all([email, password]):
             return jsonify({
                 'success': False,
                 'message': 'Email and password are required'
             }), 400
         
-        # Get Firestore client
-        db = get_firestore_client()
-        if db is None:
+        supabase = get_supabase_client()
+        if supabase is None:
             return jsonify({
                 'success': False,
                 'message': 'Database not available'
             }), 503
         
-        # Note: Firebase Admin SDK doesn't support password verification
-        # In production, use Firebase Auth REST API or client-side Firebase Auth
-        # For now, we'll retrieve user by email and generate token
+        # Sign in with Supabase
+        auth_response = supabase.auth.sign_in_with_password({
+            'email': email,
+            'password': password
+        })
         
-        try:
-            firebase_user = firebase_auth.get_user_by_email(email)
-            uid = firebase_user.uid
-        except firebase_auth.UserNotFoundError:
+        if auth_response.user:
+            # Get user profile
+            user = User.get_by_email(email)
+            
+            session_data = None
+            access_token = None
+            
+            if auth_response.session:
+                session_data = {
+                    'access_token': auth_response.session.access_token,
+                    'refresh_token': auth_response.session.refresh_token,
+                    'expires_at': auth_response.session.expires_at,
+                    'token_type': auth_response.session.token_type
+                }
+                access_token = auth_response.session.access_token
+            
+            return jsonify({
+                'success': True,
+                'message': 'Login successful',
+                'data': {
+                    'user': user,
+                    'session': session_data,
+                    'access_token': access_token
+                }
+            }), 200
+        else:
             return jsonify({
                 'success': False,
-                'message': 'Invalid email or password'
+                'message': 'Invalid credentials'
             }), 401
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'message': 'Login failed',
-                'error': str(e)
-            }), 500
-        
-        # Get user profile from Firestore
-        user_doc = db.collection(USERS_COLLECTION).document(uid).get()
-        
-        if not user_doc.exists:
-            return jsonify({
-                'success': False,
-                'message': 'User profile not found'
-            }), 404
-        
-        user_data = user_doc.to_dict()
-        
-        # Generate JWT token
-        token = generate_jwt_token(uid)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Login successful',
-            'data': {
-                'user': user_data,
-                'token': token
-            }
-        }), 200
-        
+            
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Login failed',
-            'error': str(e)
+            'message': f'Error: {str(e)}'
         }), 500
 
 @auth_bp.route('/profile', methods=['GET'])
 @require_auth
 def get_profile():
-    """
-    Get user profile
-    Requires authentication
-    """
+    """Get user profile (requires auth token)"""
     try:
-        db = get_firestore_client()
-        if db is None:
+        user = User.get_by_email(request.user_email)
+        
+        if user:
+            return jsonify({
+                'success': True,
+                'data': user
+            }), 200
+        else:
             return jsonify({
                 'success': False,
-                'message': 'Database not available'
-            }), 503
-        
-        # Get user profile
-        user_doc = db.collection(USERS_COLLECTION).document(request.user_id).get()
-        
-        if not user_doc.exists:
-            return jsonify({
-                'success': False,
-                'message': 'User not found'
+                'message': 'User profile not found'
             }), 404
-        
-        user_data = user_doc.to_dict()
-        
-        return jsonify({
-            'success': True,
-            'data': user_data
-        }), 200
-        
+            
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Failed to get profile',
-            'error': str(e)
+            'message': f'Error: {str(e)}'
         }), 500
 
 @auth_bp.route('/profile', methods=['PUT'])
 @require_auth
 def update_profile():
-    """
-    Update user profile
-    Requires authentication
-    """
+    """Update user profile"""
     try:
         data = request.get_json()
         
-        db = get_firestore_client()
-        if db is None:
-            return jsonify({
-                'success': False,
-                'message': 'Database not available'
-            }), 503
+        # Get current user
+        user = User.get_by_email(request.user_email)
         
-        # Get current user profile
-        user_ref = db.collection(USERS_COLLECTION).document(request.user_id)
-        user_doc = user_ref.get()
-        
-        if not user_doc.exists:
+        if not user:
             return jsonify({
                 'success': False,
                 'message': 'User not found'
@@ -297,23 +272,48 @@ def update_profile():
         if 'job_role' in data:
             update_data['job_role'] = data['job_role']
         
-        update_data['updated_at'] = datetime.now()
+        if update_data:
+            updated_user = User.update(user['id'], update_data)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Profile updated successfully',
+                'data': updated_user
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No valid fields to update'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+@auth_bp.route('/logout', methods=['POST'])
+@require_auth
+def logout():
+    """Logout user (invalidate session)"""
+    try:
+        supabase = get_supabase_client()
+        if supabase is None:
+            return jsonify({
+                'success': False,
+                'message': 'Database not available'
+            }), 503
         
-        # Update in Firestore
-        user_ref.update(update_data)
-        
-        # Get updated profile
-        updated_user = user_ref.get().to_dict()
+        # Sign out from Supabase
+        supabase.auth.sign_out()
         
         return jsonify({
             'success': True,
-            'message': 'Profile updated successfully',
-            'data': updated_user
+            'message': 'Logged out successfully'
         }), 200
         
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': 'Failed to update profile',
-            'error': str(e)
+            'message': f'Error: {str(e)}'
         }), 500

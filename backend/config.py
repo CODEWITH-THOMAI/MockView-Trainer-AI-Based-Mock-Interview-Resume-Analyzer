@@ -19,14 +19,10 @@ class Config:
     # Frontend URL for CORS
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
     
-    # Firebase configuration
-    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
-    FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL', '')
-    
-    # JWT settings
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
-    JWT_ALGORITHM = 'HS256'
-    JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1 hour in seconds
+    # Supabase configuration (REPLACES Firebase)
+    SUPABASE_URL = os.getenv('SUPABASE_URL')
+    SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
+    SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
     
     # File upload settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB

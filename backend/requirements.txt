@@ -4,11 +4,9 @@ Flask-CORS==4.0.0
 python-dotenv==1.0.0
 Werkzeug==3.0.1
 
-# Firebase
-firebase-admin==6.3.0
-
-# JWT Authentication
-PyJWT==2.8.0
+# Supabase (REPLACES firebase-admin)
+supabase==2.3.0
+postgrest-py==0.13.0
 
 # NLP and ML Libraries
 nltk==3.8.1
