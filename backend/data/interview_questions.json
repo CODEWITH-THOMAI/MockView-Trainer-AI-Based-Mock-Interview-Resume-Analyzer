@@ -1,0 +1,154 @@
+{
+  "Software Engineer": {
+    "Beginner": [
+      "What is Object-Oriented Programming?",
+      "Explain the difference between a class and an object.",
+      "What is the purpose of a constructor?",
+      "What is the difference between GET and POST requests?",
+      "Explain what a REST API is.",
+      "What is version control and why is it important?",
+      "What is the difference between SQL and NoSQL databases?",
+      "Explain what a variable is in programming.",
+      "What are data types?",
+      "What is the purpose of comments in code?"
+    ],
+    "Intermediate": [
+      "Explain the SOLID principles of object-oriented design.",
+      "What is the difference between synchronous and asynchronous programming?",
+      "How would you design a caching system?",
+      "Explain the concept of database indexing.",
+      "What are design patterns? Give examples.",
+      "How do you handle errors and exceptions in your code?",
+      "Explain the concept of API rate limiting.",
+      "What is the difference between authentication and authorization?",
+      "How would you optimize database queries?",
+      "Explain the MVC architecture pattern."
+    ],
+    "Advanced": [
+      "Design a URL shortening service like bit.ly.",
+      "How would you design Twitter's architecture?",
+      "Explain microservices architecture and its trade-offs.",
+      "Design a distributed caching system.",
+      "How would you implement a load balancer?",
+      "Explain CAP theorem and its implications.",
+      "Design a real-time chat application architecture.",
+      "How would you handle millions of concurrent users?",
+      "Explain database sharding strategies.",
+      "Design a recommendation system."
+    ]
+  },
+  "Data Scientist": {
+    "Beginner": [
+      "What is the difference between supervised and unsupervised learning?",
+      "Explain what a dataset is.",
+      "What is the purpose of data preprocessing?",
+      "What is a confusion matrix?",
+      "Explain the concept of overfitting.",
+      "What is cross-validation?",
+      "What are features in machine learning?",
+      "Explain the difference between classification and regression.",
+      "What is a correlation coefficient?",
+      "What is the purpose of data visualization?"
+    ],
+    "Intermediate": [
+      "Explain the bias-variance tradeoff.",
+      "How would you handle imbalanced datasets?",
+      "What is feature engineering and why is it important?",
+      "Explain gradient descent optimization.",
+      "What is regularization and when would you use it?",
+      "How do you evaluate a machine learning model?",
+      "Explain the Random Forest algorithm.",
+      "What is dimensionality reduction?",
+      "How would you detect outliers in data?",
+      "Explain A/B testing methodology."
+    ],
+    "Advanced": [
+      "Design a recommendation system for an e-commerce platform.",
+      "How would you build a fraud detection system?",
+      "Explain transformer architecture in NLP.",
+      "Design a real-time anomaly detection system.",
+      "How would you optimize a deep learning model for production?",
+      "Explain attention mechanisms in neural networks.",
+      "Design a customer churn prediction system.",
+      "How would you handle concept drift in production models?",
+      "Explain federated learning and its applications.",
+      "Design a computer vision system for object detection."
+    ]
+  },
+  "Product Manager": {
+    "Beginner": [
+      "What is a product roadmap?",
+      "Explain the role of a Product Manager.",
+      "What is user research and why is it important?",
+      "What is an MVP (Minimum Viable Product)?",
+      "Explain the concept of user stories.",
+      "What is a product backlog?",
+      "How do you prioritize features?",
+      "What is the difference between Agile and Waterfall?",
+      "Explain what a sprint is.",
+      "What are product requirements?"
+    ],
+    "Intermediate": [
+      "How would you launch a new feature?",
+      "Explain your approach to A/B testing.",
+      "How do you measure product success?",
+      "What is your process for gathering user feedback?",
+      "How do you handle stakeholder conflicts?",
+      "Explain the concept of product-market fit.",
+      "How would you conduct competitor analysis?",
+      "What metrics would you track for a mobile app?",
+      "How do you work with engineering teams?",
+      "Explain your approach to product discovery."
+    ],
+    "Advanced": [
+      "How would you build a 0-to-1 product?",
+      "Design a product strategy for entering a new market.",
+      "How would you turn around a declining product?",
+      "Explain your framework for product prioritization.",
+      "How would you scale a product to new markets?",
+      "Design a pricing strategy for a SaaS product.",
+      "How would you handle a product crisis?",
+      "Explain your approach to platform strategy.",
+      "How would you build and manage a product team?",
+      "Design a growth strategy for a consumer app."
+    ]
+  },
+  "Frontend Developer": {
+    "Beginner": [
+      "What is the DOM?",
+      "Explain the box model in CSS.",
+      "What is the difference between var, let, and const?",
+      "What is responsive design?",
+      "Explain what JavaScript is.",
+      "What are HTML semantic tags?",
+      "What is CSS flexbox?",
+      "Explain event handling in JavaScript.",
+      "What is the purpose of media queries?",
+      "What are CSS selectors?"
+    ],
+    "Intermediate": [
+      "Explain the Virtual DOM in React.",
+      "What are React Hooks?",
+      "How do you optimize web performance?",
+      "Explain state management in React.",
+      "What is component lifecycle?",
+      "How do you handle API calls in React?",
+      "Explain CSS Grid vs Flexbox.",
+      "What are CSS preprocessors?",
+      "How do you ensure cross-browser compatibility?",
+      "Explain the concept of closures in JavaScript."
+    ],
+    "Advanced": [
+      "Design a component library architecture.",
+      "How would you implement server-side rendering?",
+      "Explain micro-frontends architecture.",
+      "How would you optimize bundle size?",
+      "Design a state management solution.",
+      "How would you implement code splitting?",
+      "Explain Progressive Web Apps (PWAs).",
+      "How would you handle real-time updates?",
+      "Design an accessibility-first component.",
+      "How would you implement lazy loading?"
+    ]
+  }
+}
