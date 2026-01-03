@@ -1,51 +1,35 @@
-# Flask and Web Framework
-Flask==3.0.0
-Flask-CORS==4.0.0
-python-dotenv==1.0.0
-Werkzeug==3.0.1
+# Flask Framework
+Flask==3.1.0
+Flask-CORS==5.0.0
+python-dotenv==1.0.1
 
-# Supabase (REPLACES firebase-admin)
-supabase==2.3.0
-postgrest-py==0.13.0
+# Supabase Client (latest compatible)
+supabase==2.10.0
 
-# NLP and ML Libraries
-nltk==3.8.1
-spacy==3.7.2
-scikit-learn==1.3.2
-numpy==1.24.3
-pandas==2.1.4
-
-# Text Processing
-textblob==0.17.1
-python-Levenshtein==0.23.0
+# NLP & ML Libraries
+nltk==3.9.1
+spacy==3.8.2
+scikit-learn==1.6.1
+textblob==0.18.0
 
 # PDF Processing
 PyPDF2==3.0.1
-pdfplumber==0.10.3
-python-docx==1.1.0
+pdfplumber==0.11.4
+reportlab==4.2.5
 
-# API and HTTP
-requests==2.31.0
-
-# Validation
-email-validator==2.1.0
-
-# Date and Time
-python-dateutil==2.8.2
+# Audio Processing (Optional)
+SpeechRecognition==3.12.0
+pydub==0.25.1
 
 # Utilities
-pathlib==1.0.1
+requests==2.32.3
+Pillow==11.0.0
+python-dateutil==2.9.0
 
-# Optional: Speech to Text (if implementing server-side)
-# SpeechRecognition==3.10.0
-# pydub==0.25.1
+# Security
+bcrypt==4.2.1
+PyJWT==2.10.1
 
-# Optional: Advanced NLP
-# transformers==4.35.2
-# torch==2.1.0
-
-# Development and Testing (optional)
-# pytest==7.4.3
-# pytest-flask==1.3.0
-# black==23.12.1
-# flake8==6.1.0
+# Additional
+pandas==2.2.3
+numpy==2.2.1
